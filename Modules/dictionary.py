@@ -64,6 +64,7 @@ def search_merriam_webster(word: str) -> tuple:
         return None, None
 
     response = r.html.find('#dictionary-entry-1', first=True).text.replace("\n", "\n\n")
+    response = response[:1000] + "..." if len(response) > 1000 else response
     response += f"\n\nFor more info visit [here.]({url})"
 
     synonyms = r.html.find('#synonyms-anchor > ul.mw-list', first=True)
