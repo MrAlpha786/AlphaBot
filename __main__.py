@@ -25,7 +25,13 @@ def help_me(update: Update, context: CallbackContext) -> None:
 
 
 def yell(update: Update, context: CallbackContext) -> None:
-    text_yell = ' '.join(context.args).upper() + '!'
+    text_yell = ' '.join(context.args).upper()
+    text_yell = text_yell.replace('A', 'AAA') \
+        .replace('E', 'EEE') \
+        .replace('I', 'III') \
+        .replace('O', 'OOO') \
+        .replace('U', 'UUU')
+    text_yell += text_yell[-1] * 5 + '!'
     context.bot.send_message(chat_id=update.effective_chat.id,
                              text=text_yell)
 
