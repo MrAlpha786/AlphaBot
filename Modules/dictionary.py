@@ -1,5 +1,6 @@
 import urllib.parse
 
+from requests import exceptions
 from requests_html import HTMLSession
 from telegram import ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -18,22 +19,12 @@ def _get_reply_keyboard(keys: list) -> list:
     return keyboard
 
 
-def _show_spelling_suggestions(elements: list) -> tuple:
-    if len(elements) > 10:
-        elements = elements[:10]
+def _parse_response_for_synonyms(r):
+    synonyms = r.html.find('#synonyms-anchor > ul.mw-list', first=True)
+    if not synonyms:
+        return None
 
-    keyboard_keys = []
-    for p in elements:
-        keyboard_keys.append(p.text)
-
-    reply_markup = InlineKeyboardMarkup(_get_reply_keyboard(keyboard_keys))
-    response = "Sorry, I am unable to find a valid result, but here are some suggestions to try again.\n\n"
-
-    return response, reply_markup
-
-
-def _show_synonyms(element) -> InlineKeyboardMarkup:
-    keyboard_keys = element.text.replace('\n', ' ').split(',')
+    keyboard_keys = synonyms.text.replace('\n', ' ').split(',')
 
     for k in keyboard_keys:
         if "[" in k:
@@ -45,61 +36,90 @@ def _show_synonyms(element) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(_get_reply_keyboard(keyboard_keys))
 
 
-def search_merriam_webster(word: str) -> tuple:
-    base_url = "https://www.merriam-webster.com/dictionary/"
-    url = urllib.parse.urljoin(base_url, urllib.parse.quote(word))
+def _parse_response_for_suggestions(r):
+    suggestions = r.html.find('#left-content > div > p.spelling-suggestions')
+    if not suggestions:
+        return None
+
+    if len(suggestions) > 10:
+        suggestions = suggestions[:10]
+
+    keyboard_keys = []
+    for p in suggestions:
+        keyboard_keys.append(p.text)
+
+    return InlineKeyboardMarkup(_get_reply_keyboard(keyboard_keys))
+
+
+def _parse_response_for_definition(r) -> str:
+    definition = r.html.find('#dictionary-entry-1', first=True).text.replace("\n", "\n\n")
+    return definition[:1000] + "..." if len(definition) > 1000 else definition
+
+
+def _create_request(url: str):
     session = HTMLSession()
 
     try:
         r = session.get(url=url)
+        return r
+    except exceptions:
+        return None
 
-        if r.status_code == 404:
-            suggestions = r.html.find('#left-content > div > p.spelling-suggestions')
-            if not suggestions:
-                return None, None
-            return _show_spelling_suggestions(suggestions)
 
-        r.raise_for_status()
-    except IOError:
+def _create_url(base_url: str, param: str) -> str:
+    return urllib.parse.urljoin(base_url, urllib.parse.quote(param))
+
+
+def _get_definition(word: str):
+    base_url = "https://www.merriam-webster.com/dictionary/"
+    url = _create_url(base_url=base_url, param=word)
+
+    response = _create_request(url)
+    if response is None:
         return None, None
 
-    response = r.html.find('#dictionary-entry-1', first=True).text.replace("\n", "\n\n")
-    response = response[:1000] + "..." if len(response) > 1000 else response
-    response += f"\n\nFor more info visit [here.]({url})"
+    if response.status_code == 404:
+        text = "Sorry, I am unable to find a valid result, but here are some suggestions to try again.\n\n"
+        reply_markup = _parse_response_for_suggestions(response)
 
-    synonyms = r.html.find('#synonyms-anchor > ul.mw-list', first=True)
-    if not synonyms:
-        return response, None
+    else:
+        text = _parse_response_for_definition(response)
+        text += f"\n\nFor more info visit [here.]({url})"
 
-    reply_markup = _show_synonyms(synonyms)
-    response += f"\n\nBy the way, here are some synonyms."
+        reply_markup = _parse_response_for_synonyms(response)
 
-    return response, reply_markup
+        if reply_markup is not None:
+            text += f"\n\nBy the way, here are some synonyms."
+
+    return text, reply_markup
 
 
 def define_reply(update, _) -> None:
     query = update.callback_query
     query.answer()
-    if not query.data == "cancel":
-        response, reply_markup = search_merriam_webster(query.data)
-        if not response:
-            response = "Sorry, There might be a problem."
-        query.edit_message_text(text=response,
+    if query.data == "cancel":
+        query.edit_message_reply_markup()
+
+    else:
+        text, reply_markup = _get_definition(query.data)
+
+        if text is None:
+            text = "Sorry, There might be a problem."
+
+        query.edit_message_text(text=text,
                                 reply_markup=reply_markup,
                                 disable_web_page_preview=True,
                                 parse_mode=ParseMode.MARKDOWN)
-    else:
-        query.edit_message_reply_markup()
 
 
 def define(update, context) -> None:
-    response, reply_markup = search_merriam_webster(' '.join(context.args))
+    text, reply_markup = _get_definition(' '.join(context.args))
 
-    if response is None:
-        response = "Sorry, There might be a problem."
+    if text is None:
+        text = "Sorry, There might be a problem."
 
     context.bot.send_message(chat_id=update.effective_chat.id,
-                             text=response,
+                             text=text,
                              reply_markup=reply_markup,
                              disable_web_page_preview=True,
                              parse_mode=ParseMode.MARKDOWN)
