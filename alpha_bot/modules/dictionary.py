@@ -2,21 +2,11 @@ import urllib.parse
 
 from requests import exceptions
 from requests_html import HTMLSession
-from telegram import ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ParseMode
+from telegram.ext import CommandHandler, CallbackQueryHandler
 
-
-def _get_reply_keyboard(keys: list) -> list:
-    keyboard = []
-    row = []
-    for k in keys:
-        if len(row) == 2:
-            keyboard.append(row)
-            row = []
-        row.append(InlineKeyboardButton(text=k, callback_data=k))
-    keyboard.append(row)
-    keyboard.append([InlineKeyboardButton(text="Cancel", callback_data="cancel")])
-
-    return keyboard
+from alpha_bot import dispatcher
+from alpha_bot.modules.utils.keyboard import get_keyboard_markup
 
 
 def _parse_response_for_synonyms(r):
@@ -30,10 +20,10 @@ def _parse_response_for_synonyms(r):
         if "[" in k:
             keyboard_keys.remove(k)
 
-    if len(keyboard_keys) > 4:
-        keyboard_keys = keyboard_keys[:4]
+    if len(keyboard_keys) > 6:
+        keyboard_keys = keyboard_keys[:6]
 
-    return InlineKeyboardMarkup(_get_reply_keyboard(keyboard_keys))
+    return get_keyboard_markup(keyboard_keys, prefix="define")
 
 
 def _parse_response_for_suggestions(r):
@@ -48,7 +38,7 @@ def _parse_response_for_suggestions(r):
     for p in suggestions:
         keyboard_keys.append(p.text)
 
-    return InlineKeyboardMarkup(_get_reply_keyboard(keyboard_keys))
+    return get_keyboard_markup(keyboard_keys, prefix="define")
 
 
 def _parse_response_for_definition(r) -> str:
@@ -97,19 +87,16 @@ def _get_definition(word: str):
 def define_reply(update, _) -> None:
     query = update.callback_query
     query.answer()
-    if query.data == "cancel":
-        query.edit_message_reply_markup()
 
-    else:
-        text, reply_markup = _get_definition(query.data)
+    text, reply_markup = _get_definition(query.data[7:])
 
-        if text is None:
-            text = "Sorry, There might be a problem."
+    if text is None:
+        text = "Sorry, There might be a problem."
 
-        query.edit_message_text(text=text,
-                                reply_markup=reply_markup,
-                                disable_web_page_preview=True,
-                                parse_mode=ParseMode.MARKDOWN)
+    query.edit_message_text(text=text,
+                            reply_markup=reply_markup,
+                            disable_web_page_preview=True,
+                            parse_mode=ParseMode.MARKDOWN)
 
 
 def define(update, context) -> None:
@@ -123,3 +110,15 @@ def define(update, context) -> None:
                              reply_markup=reply_markup,
                              disable_web_page_preview=True,
                              parse_mode=ParseMode.MARKDOWN)
+
+
+__help_str__ = """ *Dictionary*
+
+Available commands: 
+
+/define <Word or Phrase>: spelling suggestions or definition + synonyms"""
+
+__mod_name__ = "dictionary"
+
+dispatcher.add_handler(CommandHandler('define', define))
+dispatcher.add_handler(CallbackQueryHandler(define_reply, pattern=r"define_"))
