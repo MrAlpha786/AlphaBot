@@ -69,8 +69,11 @@ def _get_definition(word: str):
         return None, None
 
     if response.status_code == 404:
-        text = "Sorry, I am unable to find a valid result, but here are some suggestions to try again.\n\n"
+        text = "Sorry, I am unable to find a valid result."
         reply_markup = _parse_response_for_suggestions(response)
+
+        if reply_markup is not None:
+            text += f" But here are some suggestions to try again.\n\n"
 
     else:
         text = _parse_response_for_definition(response)
