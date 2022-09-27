@@ -42,7 +42,8 @@ def _parse_response_for_suggestions(r):
 
 
 def _parse_response_for_definition(r) -> str:
-    definition = r.html.find('#dictionary-entry-1', first=True).text.replace("\n", "\n\n")
+    definition = r.html.find('#dictionary-entry-1',
+                             first=True).text.replace("\n", "\n\n")
     return definition[:1000] + "..." if len(definition) > 1000 else definition
 
 

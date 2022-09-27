@@ -2,8 +2,8 @@ class Config(object):
     LOGGER = True
 
     BOT_TOKEN = ""
-    OWNER_ID = "587454251"
-    OWNER_USERNAME = "MrAlpha786"
+    OWNER_ID = ""
+    OWNER_USERNAME = ""
 
     WEBHOOK = False
     PORT = 8443

@@ -9,7 +9,8 @@ def get_keyboard_markup(buttons: list, prefix: str) -> InlineKeyboardMarkup:
             keyboard.append(row)
             row = []
         else:
-            row.append(InlineKeyboardButton(text=b, callback_data=prefix + "_" + b))
+            row.append(InlineKeyboardButton(
+                text=b, callback_data=prefix + "_" + b))
     keyboard.append(row)
 
     return InlineKeyboardMarkup(keyboard)
