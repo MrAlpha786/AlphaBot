@@ -10,7 +10,7 @@ from alpha_bot.modules.utils.keyboard import get_keyboard_markup
 HELP_STRINGS = {}
 
 __help_str__ = """
-Hello! my name *{}*.
+Hello! my name is *{}*.
 
 *Main* available commands:
  - /start: Start the bot...
